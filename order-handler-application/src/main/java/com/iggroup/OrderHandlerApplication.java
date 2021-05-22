@@ -1,6 +1,7 @@
 package com.iggroup;
 
 import com.iggroup.handler.DefaultOrderHandler;
+import com.iggroup.handler.OrderHandler;
 import com.iggroup.model.Side;
 import com.iggroup.producer.OrderProducer;
 import com.iggroup.provider.OrderBookProvider;
@@ -12,8 +13,8 @@ import lombok.extern.slf4j.Slf4j;
 public class OrderHandlerApplication {
 
     public static void main(String[] args) throws InterruptedException {
-        DefaultOrderHandler orderHandler = new DefaultOrderHandler(OrderBookProvider.getInstance(),
-                                                                   TradeService.getInstance());
+        OrderHandler orderHandler = new DefaultOrderHandler(OrderBookProvider.getInstance(),
+                                                            TradeService.getInstance());
         startProducer(orderHandler);
         startProducer(orderHandler);
 
@@ -31,7 +32,7 @@ public class OrderHandlerApplication {
      * simplicity/test sample and for anyone see orderHandler add in action
      * 
      */
-    private static void startProducer(DefaultOrderHandler orderHandler) {
+    private static void startProducer(OrderHandler orderHandler) {
         new Thread(() -> {
             OrderProducer producer = new OrderProducer();
             while (true) {
