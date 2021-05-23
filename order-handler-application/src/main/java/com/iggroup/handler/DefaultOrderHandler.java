@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.Map.Entry;
 import java.util.NavigableSet;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
@@ -12,7 +13,6 @@ import com.iggroup.model.Order;
 import com.iggroup.model.OrderBook;
 import com.iggroup.model.Side;
 import com.iggroup.provider.OrderBookProvider;
-import com.iggroup.service.TradeService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,17 +22,17 @@ import lombok.extern.slf4j.Slf4j;
 public class DefaultOrderHandler implements OrderHandler {
 
     private final OrderBookProvider provider;
-    private final TradeService tradeService;
+    private final BlockingQueue<Order> tradeQueue;
 
     @Override
     public void addOrder(final Order order) {
-        log.debug("Adding OrderId [{}]...", order.getId());
+        log.debug("Adding Order [{}]...", order);
         provider.getOrderBookBySymbol(order.getSymbol())
                 .getOrders(order.getSide())
                 .computeIfAbsent(order.getPrice(), k -> new ConcurrentSkipListSet<>())
                 .add(order);
         log.debug("OrderId [{}] has been added.", order.getId());
-        tradeService.executeTradePlan(order, this::removeOrder);
+        tradeQueue.add(order);
     }
 
     @Override
@@ -44,8 +44,8 @@ public class DefaultOrderHandler implements OrderHandler {
         }
 
         log.debug("Modifying OrderId [{}] price [{}] and quantity [{}] by removing and adding...", order.getId(), order.getPrice(), order.getQuantity());
+        modifiedOrder.setModification(order.getModification() + 1);
         removeOrder(order);
-        modifiedOrder.setModification(modifiedOrder.getModification() + 1);
         addOrder(modifiedOrder);
 
         log.debug("OrderId [{}] has been modified with new price of [{}] and quantity [{}].", modifiedOrder.getId(), modifiedOrder.getPrice(),
@@ -60,7 +60,7 @@ public class DefaultOrderHandler implements OrderHandler {
         NavigableSet<Order> orders = ordersMap.get(order.getPrice());
 
         if (orders.size() == 1) {
-            ordersMap.remove(order.getPrice()); // Remove navigableSet as well as last element in set
+            ordersMap.remove(order.getPrice()); // Remove price level and (navigableSet as well as last element)
         } else {
             orders.remove(order);
         }
@@ -84,7 +84,7 @@ public class DefaultOrderHandler implements OrderHandler {
         for (Entry<BigDecimal, NavigableSet<Order>> entry : orders.entrySet()) {
             final BigDecimal totalQuantityByPrice = entry.getValue()
                                                          .stream()
-                                                         .map(o -> BigDecimal.valueOf(o.getQuantity()))
+                                                         .map(o -> BigDecimal.valueOf(o.getQuantity().get()))
                                                          .reduce((a, b) -> a.add(b))
                                                          .orElseGet(() -> BigDecimal.ZERO);
             final BigDecimal previousCurrQuantity = currentQuantity;

@@ -94,7 +94,7 @@ public final class PrinterUtils {
      */
     private static Optional<Pair<BigDecimal, Integer>> mapToPAndQ(Collection<Order> sellOrders) {
         return sellOrders.stream()
-                         .map(order -> Pair.of(order.getPrice(), order.getQuantity()))
+                         .map(order -> Pair.of(order.getPrice(), order.getQuantity().get()))
                          .reduce((a, b) -> Pair.of(a.getLeft(), a.getRight() + b.getRight()));
     }
 

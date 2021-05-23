@@ -3,6 +3,7 @@ package com.iggroup.model;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,7 +20,7 @@ public class Order implements Comparable<Order> {
 
     @EqualsAndHashCode.Include
     private Long id;
-    private Integer quantity;
+    private AtomicInteger quantity;
     private BigDecimal price;
     private Side side;
     private String symbol;
