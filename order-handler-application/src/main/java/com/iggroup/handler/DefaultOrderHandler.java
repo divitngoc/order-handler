@@ -9,6 +9,7 @@ import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListSet;
 
 import com.iggroup.exception.OrderModificationException;
+import com.iggroup.lock.OrdersLock;
 import com.iggroup.model.Order;
 import com.iggroup.model.OrderBook;
 import com.iggroup.model.Side;
@@ -29,27 +30,47 @@ public class DefaultOrderHandler implements OrderHandler {
         log.debug("Adding Order [{}]...", order);
         provider.getOrderBookBySymbol(order.getSymbol())
                 .getOrders(order.getSide())
-                .computeIfAbsent(order.getPrice(), k -> new ConcurrentSkipListSet<>())
+                .computeIfAbsent(order.getPrice().get(), k -> new ConcurrentSkipListSet<>())
                 .add(order);
         log.debug("OrderId [{}] has been added.", order.getId());
         tradeQueue.add(order);
     }
 
+    /**
+     *
+     * Only can modify price and quantity of an order
+     *
+     */
     @Override
     public void modifyOrder(final Order order, final Order modifiedOrder) throws OrderModificationException {
-        log.debug("Modifying OrderId [{}]..", order.getId());
-        if (order.getModification() > 4) {
-            log.debug("OrderId [{}] has more than 4 modifications applied, cannot be modified further", modifiedOrder.getId());
-            throw new OrderModificationException("OrderId [" + order.getId() + "] has more than 4 modifications applied, cannot be modified further.");
+        log.debug("Modifying OrderId [{}]...", order.getId());
+        synchronized (OrdersLock.acquireLock(order.getId())) {
+            if (!provider.checkIfOrderExists(order)) {
+                OrdersLock.notifyLock(order.getId());
+                log.debug("Order does not exist anymore for modifying");
+                return;
+            }
+            
+            if (order.getModification().get() > 4) {
+                log.debug("OrderId [{}] has more than 4 modifications applied, cannot be modified further", modifiedOrder.getId());
+                OrdersLock.notifyLock(order.getId());
+                throw new OrderModificationException("OrderId [" + order.getId() + "] has more than 4 modifications applied, cannot be modified further.");
+            }
+
+            log.debug("Modifying OrderId [{}] price [{}] and quantity [{}]...", order.getId(), order.getPrice().get(), order.getQuantity());
+            order.getModification().incrementAndGet();
+            order.getQuantity().set(modifiedOrder.getQuantity().intValue());
+
+            if (order.getPrice().get() != modifiedOrder.getPrice().get()) {
+                log.debug("Modifying OrderId [{}] price [{}] and quantity [{}] by removing and adding...", order.getId(), order.getPrice().get(), order.getQuantity());
+                removeOrder(order);
+                order.getPrice().set(modifiedOrder.getPrice().get());
+                addOrder(order);
+            }
+            log.debug("OrderId [{}] has been modified with new price of [{}] and quantity [{}].", modifiedOrder.getId(), modifiedOrder.getPrice(),
+                      modifiedOrder.getQuantity().get());
+            OrdersLock.notifyLock(order.getId());
         }
-
-        log.debug("Modifying OrderId [{}] price [{}] and quantity [{}] by removing and adding...", order.getId(), order.getPrice(), order.getQuantity());
-        modifiedOrder.setModification(order.getModification() + 1);
-        removeOrder(order);
-        addOrder(modifiedOrder);
-
-        log.debug("OrderId [{}] has been modified with new price of [{}] and quantity [{}].", modifiedOrder.getId(), modifiedOrder.getPrice(),
-                  modifiedOrder.getQuantity());
     }
 
     @Override
@@ -57,10 +78,10 @@ public class DefaultOrderHandler implements OrderHandler {
         log.debug("Removing orderId [{}]...", order.getId());
         OrderBook orderBook = provider.getOrderBookBySymbol(order.getSymbol());
         ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> ordersMap = orderBook.getOrders(order.getSide());
-        NavigableSet<Order> orders = ordersMap.get(order.getPrice());
+        NavigableSet<Order> orders = ordersMap.get(order.getPrice().get());
 
         if (orders.size() == 1) {
-            ordersMap.remove(order.getPrice()); // Remove price level and (navigableSet as well as last element)
+            ordersMap.remove(order.getPrice().get()); // Remove price level and (navigableSet as well as last element)
         } else {
             orders.remove(order);
         }
@@ -75,7 +96,7 @@ public class DefaultOrderHandler implements OrderHandler {
      */
     @Override
     public double getPrice(final String symbol, final int quantity, final Side side) {
-        log.debug("Getting best price for symbol [{}], quantity [{}], and order type [{}]", symbol, quantity, side);
+        log.debug("Getting best price for symbol [{}], quantity [{}], and order type [{}]...", symbol, quantity, side);
         final BigDecimal quantityBdec = BigDecimal.valueOf(quantity); // For calculation
         final ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> orders = provider.getOrderBookBySymbol(symbol)
                                                                                        .getOrders(side);

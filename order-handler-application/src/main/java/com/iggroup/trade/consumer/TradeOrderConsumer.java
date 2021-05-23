@@ -6,7 +6,6 @@ import java.util.Map.Entry;
 import java.util.NavigableSet;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentNavigableMap;
-import java.util.concurrent.ConcurrentSkipListSet;
 import java.util.function.Consumer;
 
 import com.iggroup.lock.OrdersLock;
@@ -58,7 +57,7 @@ public class TradeOrderConsumer implements Runnable {
      * @throws InterruptedException
      */
     public void executeTradePlan(final Order order) {
-        if (!checkIfOrderExists(order)) return;
+        if (!provider.checkIfOrderExists(order)) return;
 
         final ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> orderMap = getOppositeSideOrderMap(order.getSymbol(), order.getSide());
         log.debug("ExecuteTradePlan for OrderId [{}]", order.getId());
@@ -85,7 +84,7 @@ public class TradeOrderConsumer implements Runnable {
 
             log.debug("Price match against orderId: {}", orderToTradeAgainst.getId());
             synchronized (OrdersLock.acquireLock(orderToTradeAgainst.getId())) {
-                if (!checkIfOrderExists(orderToTradeAgainst)) {
+                if (!provider.checkIfOrderExists(orderToTradeAgainst)) {
                     OrdersLock.notifyLock(orderToTradeAgainst.getId());
                     continue;
                 }
@@ -106,13 +105,6 @@ public class TradeOrderConsumer implements Runnable {
             }
         }
         return order.getQuantity().get();
-    }
-
-    private boolean checkIfOrderExists(final Order order) {
-        return provider.getOrderBookBySymbol(order.getSymbol())
-                       .getOrders(order.getSide())
-                       .getOrDefault(order.getPrice(), new ConcurrentSkipListSet<>())
-                       .contains(order);
     }
 
     private void orderCompletelyFilledAndOrderAgainstPartiallyFilled(final Order order, final Order orderToTradeAgainst, int previousQuantTotal) {
@@ -159,7 +151,7 @@ public class TradeOrderConsumer implements Runnable {
      * @return
      */
     private boolean priceMatch(BigDecimal levelPrice, Order order) {
-        return levelPrice.compareTo(order.getPrice()) != (order.getSide() == Side.BUY ? 1 : -1);
+        return levelPrice.compareTo(order.getPrice().get()) != (order.getSide() == Side.BUY ? 1 : -1);
     }
 
     private ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> getOppositeSideOrderMap(final String symbol, final Side side) {

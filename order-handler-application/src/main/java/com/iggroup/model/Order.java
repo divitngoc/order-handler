@@ -1,9 +1,10 @@
 package com.iggroup.model;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import com.iggroup.model.concurrent.AtomicBigDecimal;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,13 +22,13 @@ public class Order implements Comparable<Order> {
     @EqualsAndHashCode.Include
     private Long id;
     private AtomicInteger quantity;
-    private BigDecimal price;
+    private AtomicBigDecimal price;
     private Side side;
     private String symbol;
     @Builder.Default
     private Instant arrivalDateTime = Instant.now();
     @Builder.Default
-    private int modification = 0;
+    private AtomicInteger modification = new AtomicInteger();
 
     @Override
     public int compareTo(Order o) {

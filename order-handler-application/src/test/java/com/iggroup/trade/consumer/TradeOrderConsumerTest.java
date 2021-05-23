@@ -21,8 +21,8 @@ import org.junit.jupiter.api.Test;
 
 import com.iggroup.factory.OrderFactory;
 import com.iggroup.model.Order;
+import com.iggroup.model.concurrent.AtomicBigDecimal;
 import com.iggroup.provider.OrderBookProvider;
-import com.iggroup.trade.consumer.TradeOrderConsumer;
 
 class TradeOrderConsumerTest {
 
@@ -54,9 +54,9 @@ class TradeOrderConsumerTest {
         // Given
         Order buyOrder = createOrder();
         buyOrder.setArrivalDateTime(Instant.now().plusSeconds(1));
-        buyOrder.setPrice(BigDecimal.valueOf(52));
+        buyOrder.setPrice(AtomicBigDecimal.valueOf(52));
         buyOrder.setQuantity(new AtomicInteger(80));
-        provider.getOrderBookBySymbol("IGG").getBuyOrders().computeIfAbsent(buyOrder.getPrice(), k -> new ConcurrentSkipListSet<>()).add(buyOrder);
+        provider.getOrderBookBySymbol("IGG").getBuyOrders().computeIfAbsent(buyOrder.getPrice().get(), k -> new ConcurrentSkipListSet<>()).add(buyOrder);
         NavigableSet<Order> firstLevel = provider.getOrderBookBySymbol("IGG").getSellOrders().get(BigDecimal.valueOf(51));
         NavigableSet<Order> secondLevel = provider.getOrderBookBySymbol("IGG").getSellOrders().get(BigDecimal.valueOf(52));
         List<Order> expectedRemoved = firstLevel.stream().collect(Collectors.toList()); // Already sorted by price and arrivaldatetime
@@ -76,9 +76,9 @@ class TradeOrderConsumerTest {
     void testExecuteTradePlan_OrderExecutedFirstWithArrival() {
         // Given
         Order buyOrder = createOrder();
-        buyOrder.setPrice(BigDecimal.valueOf(51));
+        buyOrder.setPrice(AtomicBigDecimal.valueOf(51));
         buyOrder.setQuantity(new AtomicInteger(10));
-        provider.getOrderBookBySymbol("IGG").getBuyOrders().computeIfAbsent(buyOrder.getPrice(), k -> new ConcurrentSkipListSet<>()).add(buyOrder);
+        provider.getOrderBookBySymbol("IGG").getBuyOrders().computeIfAbsent(buyOrder.getPrice().get(), k -> new ConcurrentSkipListSet<>()).add(buyOrder);
         NavigableSet<Order> firstLevel = provider.getOrderBookBySymbol("IGG").getSellOrders().get(BigDecimal.valueOf(51));
         List<Order> expectedRemoved = new ArrayList<>(); // Already sorted by price and arrivaldatetime
         expectedRemoved.add(firstLevel.first());
@@ -94,9 +94,9 @@ class TradeOrderConsumerTest {
     void testExecuteTradePlan_PartiallyFilled() {
         // Given
         Order buyOrder = createOrder();
-        buyOrder.setPrice(BigDecimal.valueOf(51));
+        buyOrder.setPrice(AtomicBigDecimal.valueOf(51));
         buyOrder.setQuantity(new AtomicInteger(5));
-        provider.getOrderBookBySymbol("IGG").getBuyOrders().computeIfAbsent(buyOrder.getPrice(), k -> new ConcurrentSkipListSet<>()).add(buyOrder);
+        provider.getOrderBookBySymbol("IGG").getBuyOrders().computeIfAbsent(buyOrder.getPrice().get(), k -> new ConcurrentSkipListSet<>()).add(buyOrder);
         NavigableSet<Order> firstLevel = provider.getOrderBookBySymbol("IGG").getSellOrders().get(BigDecimal.valueOf(51));
         List<Order> expectedRemoved = new ArrayList<>(); // Already sorted by price and arrivaldatetime
         expectedRemoved.add(buyOrder);
@@ -113,7 +113,7 @@ class TradeOrderConsumerTest {
     void testExecuteTradePlan_NoPriceMatch() {
         // Given
         Order buyOrder = createOrder();
-        buyOrder.setPrice(BigDecimal.valueOf(1));
+        buyOrder.setPrice(AtomicBigDecimal.valueOf(1));
 
         // When
         tradeService.executeTradePlan(buyOrder);

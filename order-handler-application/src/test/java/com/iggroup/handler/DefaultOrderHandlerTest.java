@@ -55,14 +55,14 @@ class DefaultOrderHandlerTest {
         // Then
         // buy orders
         assertThat(provider.getOrderBookBySymbol(SYMBOL_IGG).getBuyOrders()).hasSize(1)
-                                                                            .containsOnlyKeys(order1.getPrice())
-                                                                            .extractingByKey(order1.getPrice())
+                                                                            .containsOnlyKeys(order1.getPrice().get())
+                                                                            .extractingByKey(order1.getPrice().get())
                                                                             .extracting(NavigableSet::size)
                                                                             .isEqualTo(2);
         // sell orders
         assertThat(provider.getOrderBookBySymbol(SYMBOL_IGG).getSellOrders()).hasSize(1)
-                                                                             .containsOnlyKeys(order3.getPrice())
-                                                                             .extractingByKey(order3.getPrice())
+                                                                             .containsOnlyKeys(order3.getPrice().get())
+                                                                             .extractingByKey(order3.getPrice().get())
                                                                              .extracting(NavigableSet::size)
                                                                              .isEqualTo(1);
         assertThat(tradeQueue).hasSize(3);
@@ -74,7 +74,7 @@ class DefaultOrderHandlerTest {
         Order order = createOrder(Side.BUY, BigDecimal.TEN);
         provider.getOrderBookBySymbol(SYMBOL_IGG)
                 .getBuyOrders()
-                .computeIfAbsent(order.getPrice(), k -> new ConcurrentSkipListSet<>())
+                .computeIfAbsent(order.getPrice().get(), k -> new ConcurrentSkipListSet<>())
                 .add(order);
         Order modifiedOrder = createOrder(Side.BUY, BigDecimal.ONE);
         modifiedOrder.setId(order.getId());
@@ -85,17 +85,16 @@ class DefaultOrderHandlerTest {
 
         // Then
         assertThat(provider.getOrderBookBySymbol(SYMBOL_IGG).getBuyOrders()).hasSize(1)
-                                                                            .containsOnlyKeys(modifiedOrder.getPrice())
-                                                                            .extractingByKey(modifiedOrder.getPrice());
+                                                                            .containsOnlyKeys(modifiedOrder.getPrice().get());
 
         assertThat(provider.getOrderBookBySymbol(SYMBOL_IGG)
                            .getBuyOrders()
-                           .get(modifiedOrder.getPrice())).extracting(Order::getModification,
-                                                                      Order::getQuantity,
-                                                                      Order::getPrice)
-                                                          .containsOnly(tuple(modifiedOrder.getModification(),
-                                                                              modifiedOrder.getQuantity(),
-                                                                              modifiedOrder.getPrice()));
+                           .get(modifiedOrder.getPrice().get())).extracting(o -> o.getModification().get(),
+                                                                            o -> o.getQuantity().get(),
+                                                                            o -> o.getPrice().get())
+                                                                .containsOnly(tuple(1,
+                                                                                    modifiedOrder.getQuantity().get(),
+                                                                                    modifiedOrder.getPrice().get()));
         assertThat(tradeQueue).hasSize(1);
     }
 
@@ -103,10 +102,10 @@ class DefaultOrderHandlerTest {
     void testModifyModificationException() throws OrderModificationException {
         // Given
         Order order = createOrder(Side.BUY, BigDecimal.TEN);
-        order.setModification(5);
+        order.setModification(new AtomicInteger(5));
         provider.getOrderBookBySymbol(SYMBOL_IGG)
                 .getBuyOrders()
-                .computeIfAbsent(order.getPrice(), k -> new ConcurrentSkipListSet<>())
+                .computeIfAbsent(order.getPrice().get(), k -> new ConcurrentSkipListSet<>())
                 .add(order);
         Order modifiedOrder = createOrder(Side.BUY, BigDecimal.ONE);
         modifiedOrder.setId(order.getId());
@@ -123,7 +122,7 @@ class DefaultOrderHandlerTest {
         Order order = createOrder();
         NavigableSet<Order> orders = provider.getOrderBookBySymbol(SYMBOL_IGG)
                                              .getBuyOrders()
-                                             .computeIfAbsent(order.getPrice(), k -> new ConcurrentSkipListSet<>());
+                                             .computeIfAbsent(order.getPrice().get(), k -> new ConcurrentSkipListSet<>());
         orders.add(order);
 
         // When

@@ -1,6 +1,5 @@
 package com.iggroup.producer;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -8,6 +7,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import com.iggroup.model.Order;
 import com.iggroup.model.Side;
+import com.iggroup.model.concurrent.AtomicBigDecimal;
 
 /**
  * 
@@ -26,7 +26,7 @@ public class OrderProducer {
                     .arrivalDateTime(Instant.now())
                     .symbol(symbol)
                     .quantity(new AtomicInteger(random.nextInt(20) + 1))
-                    .price(BigDecimal.valueOf(random.nextInt(50) + 1))
+                    .price(AtomicBigDecimal.valueOf(random.nextInt(50) + 1))
                     .side(random.nextBoolean() ? Side.BUY : Side.SELL)
                     .build();
     }

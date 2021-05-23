@@ -9,6 +9,7 @@ import java.util.stream.IntStream;
 
 import com.iggroup.model.Order;
 import com.iggroup.model.Side;
+import com.iggroup.model.concurrent.AtomicBigDecimal;
 import com.iggroup.provider.OrderBookProvider;
 
 public final class OrderFactory {
@@ -27,7 +28,7 @@ public final class OrderFactory {
                     .arrivalDateTime(Instant.now())
                     .symbol("IGG")
                     .quantity(new AtomicInteger(10))
-                    .price(price)
+                    .price(AtomicBigDecimal.valueOf(price))
                     .side(side)
                     .build();
     }
@@ -107,7 +108,7 @@ public final class OrderFactory {
             order.setArrivalDateTime(order.getArrivalDateTime().minusSeconds(i));
             provider.getOrderBookBySymbol("IGG")
                     .getSellOrders()
-                    .computeIfAbsent(order.getPrice(), k -> new ConcurrentSkipListSet<>())
+                    .computeIfAbsent(order.getPrice().get(), k -> new ConcurrentSkipListSet<>())
                     .add(order);
         });
 
@@ -116,7 +117,7 @@ public final class OrderFactory {
             order.setArrivalDateTime(order.getArrivalDateTime().minusSeconds(i));
             provider.getOrderBookBySymbol("IGG")
                     .getBuyOrders()
-                    .computeIfAbsent(order.getPrice(), k -> new ConcurrentSkipListSet<>())
+                    .computeIfAbsent(order.getPrice().get(), k -> new ConcurrentSkipListSet<>())
                     .add(order);
         });
         // PrinterUtils.printStatus(provider.getOrderBookBySymbol("IGG"));
