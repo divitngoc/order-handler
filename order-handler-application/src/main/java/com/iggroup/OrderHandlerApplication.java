@@ -52,7 +52,7 @@ public class OrderHandlerApplication {
             while (true) {
                 orderHandler.addOrder(producer.produce(symbol));
                 try {
-                    Thread.sleep((r.nextInt(4) + 1) * 1000);
+                    Thread.sleep((r.nextInt(5) + 5) * 100);
                 } catch (InterruptedException e) {
                     throw new RuntimeException(e);
                 }

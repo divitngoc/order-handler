@@ -24,11 +24,17 @@ public final class PrinterUtils {
 
     private PrinterUtils() {}
 
+    public static void printStatus(final OrderBook orderBook) {
+        printStatus(orderBook, Math.max(orderBook.getBuyOrders().values().size(),
+                                        orderBook.getSellOrders().values().size()));
+    }
+
     /**
      * 
-     * Print orderbook for a specific symbol in a nice format, see below for example:
+     * Print orderbook for a specific symbol in a nice format up to the maxPriceLevel, see below for example:
      * 
      * <pre>
+     * printStatus(order, 3);
      *   ================================== SYMBOL [IGG] ==================================
      *   ___________________________________________________________________________________
      *   | Order Count| Ask Quantity| Ask Price| Level| Bid price| Bid Quantity| Order Count|
@@ -38,17 +44,15 @@ public final class PrinterUtils {
      *   | 1          | 5           | 30       | 3    | -        | -           | -          |
      * </pre>
      * 
-     * @param orderBook
      */
-    public static void printStatus(final OrderBook orderBook) {
+    public static void printStatus(final OrderBook orderBook, final int maxPriceLevel) {
         Collection<NavigableSet<Order>> buyOrders = orderBook.getBuyOrders().values();
         Collection<NavigableSet<Order>> sellOrders = orderBook.getSellOrders().values();
         Iterator<NavigableSet<Order>> buyIt = buyOrders.iterator();
         Iterator<NavigableSet<Order>> sellIt = sellOrders.iterator();
-        final int maxLength = Math.max(buyOrders.size(), sellOrders.size());
-        final String[][] data = new String[maxLength][];
-        int level = 1;
-        while (buyIt.hasNext() || sellIt.hasNext()) {
+        final String[][] data = new String[maxPriceLevel][];
+        int level = 0;
+        while (level++ < maxPriceLevel){
             List<String> row = new ArrayList<>();
             row.addAll(getDataFromOrders(sellIt));
             row.add(String.valueOf(level));
@@ -58,7 +62,6 @@ public final class PrinterUtils {
             row.addAll(buyData);
 
             data[level - 1] = row.toArray(new String[0]);
-            level++;
         }
         log.info("\n================================== SYMBOL [{}] ==================================", orderBook.getSymbol());
         new TextTable(HEADERS, data).printTable();
