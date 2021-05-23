@@ -5,19 +5,17 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.groups.Tuple.tuple;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 
 import java.math.BigDecimal;
 import java.util.NavigableSet;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ConcurrentSkipListSet;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.iggroup.exception.OrderModificationException;
@@ -25,14 +23,12 @@ import com.iggroup.factory.OrderFactory;
 import com.iggroup.model.Order;
 import com.iggroup.model.Side;
 import com.iggroup.provider.OrderBookProvider;
-import com.iggroup.service.TradeService;
 
 @ExtendWith(MockitoExtension.class)
 class DefaultOrderHandlerTest {
 
-    @Mock
-    private TradeService tradeService;
     private DefaultOrderHandler orderHandler;
+    private BlockingQueue<Order> tradeQueue = new ArrayBlockingQueue<>(500);
 
     private OrderBookProvider provider = OrderBookProvider.getInstance();
     private static final String SYMBOL_IGG = "IGG";
@@ -40,7 +36,8 @@ class DefaultOrderHandlerTest {
     @BeforeEach
     void setup() {
         provider.getOrderBooks().clear();
-        orderHandler = new DefaultOrderHandler(provider, tradeService);
+        tradeQueue.clear();
+        orderHandler = new DefaultOrderHandler(provider, tradeQueue);
     }
 
     @Test
@@ -68,7 +65,7 @@ class DefaultOrderHandlerTest {
                                                                              .extractingByKey(order3.getPrice())
                                                                              .extracting(NavigableSet::size)
                                                                              .isEqualTo(1);
-        verify(tradeService, times(3)).executeTradePlan(any(), any());
+        assertThat(tradeQueue).hasSize(3);
     }
 
     @Test
@@ -81,7 +78,7 @@ class DefaultOrderHandlerTest {
                 .add(order);
         Order modifiedOrder = createOrder(Side.BUY, BigDecimal.ONE);
         modifiedOrder.setId(order.getId());
-        modifiedOrder.setQuantity(3);
+        modifiedOrder.setQuantity(new AtomicInteger(3));
 
         // When
         orderHandler.modifyOrder(order, modifiedOrder);
@@ -99,7 +96,7 @@ class DefaultOrderHandlerTest {
                                                           .containsOnly(tuple(modifiedOrder.getModification(),
                                                                               modifiedOrder.getQuantity(),
                                                                               modifiedOrder.getPrice()));
-        verify(tradeService, times(1)).executeTradePlan(any(), any());
+        assertThat(tradeQueue).hasSize(1);
     }
 
     @Test
@@ -113,11 +110,11 @@ class DefaultOrderHandlerTest {
                 .add(order);
         Order modifiedOrder = createOrder(Side.BUY, BigDecimal.ONE);
         modifiedOrder.setId(order.getId());
-        modifiedOrder.setQuantity(3);
+        modifiedOrder.setQuantity(new AtomicInteger(3));
 
         // When & Then
         assertThrows(OrderModificationException.class, () -> orderHandler.modifyOrder(order, modifiedOrder));
-        verifyNoInteractions(tradeService);
+        assertThat(tradeQueue).isEmpty();
     }
 
     @Test
@@ -134,7 +131,7 @@ class DefaultOrderHandlerTest {
 
         // Then
         assertThat(provider.getOrderBookBySymbol(SYMBOL_IGG).getBuyOrders()).isEmpty();
-        verifyNoInteractions(tradeService);
+        assertThat(tradeQueue).isEmpty();
     }
 
     @Test
@@ -148,6 +145,6 @@ class DefaultOrderHandlerTest {
         // Then
         // ((40 * 50) + (60 * 49)) / 100
         assertEquals(49.4, averagePrice);
-        verifyNoInteractions(tradeService);
+        assertThat(tradeQueue).isEmpty();
     }
 }
