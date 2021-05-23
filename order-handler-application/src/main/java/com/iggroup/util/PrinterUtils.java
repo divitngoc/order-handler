@@ -26,7 +26,7 @@ public final class PrinterUtils {
 
     /**
      * 
-     * Print orderbook for a specific symbol a nice format, see below for example:
+     * Print orderbook for a specific symbol in a nice format, see below for example:
      * 
      * <pre>
      *   ================================== SYMBOL [IGG] ==================================
@@ -87,7 +87,7 @@ public final class PrinterUtils {
 
     /**
      * 
-     * Returns a pair with price and combined quantity of an order
+     * Returns a pair with price and combined quantity of an order for that price
      * 
      * @param sellOrders
      * @return

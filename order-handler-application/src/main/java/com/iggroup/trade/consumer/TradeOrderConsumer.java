@@ -70,7 +70,7 @@ public class TradeOrderConsumer implements Runnable {
             }
 
             // Ask price is lower than/equal to bid price
-            // Or the bid price is greater than the ask price
+            // Or the bid price is greater than/equal the ask price
             log.debug("Price matches...");
             int quantityLeft = executeTrade(order, entry);
             if (quantityLeft <= 0)
