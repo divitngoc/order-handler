@@ -58,12 +58,7 @@ public class TradeOrderConsumer implements Runnable {
      * @throws InterruptedException
      */
     public void executeTradePlan(final Order order) {
-        NavigableSet<Order> orders = provider.getOrderBookBySymbol(order.getSymbol())
-                                             .getOrders(order.getSide())
-                                             .getOrDefault(order.getPrice(), new ConcurrentSkipListSet<>());
-        // Double check if order is still valid
-        if (!orders.contains(order))
-            return;
+        if (!checkIfOrderExists(order)) return;
 
         final ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> orderMap = getOppositeSideOrderMap(order.getSymbol(), order.getSide());
         log.debug("ExecuteTradePlan for OrderId [{}]", order.getId());
@@ -90,10 +85,7 @@ public class TradeOrderConsumer implements Runnable {
 
             log.debug("Price match against orderId: {}", orderToTradeAgainst.getId());
             synchronized (OrdersLock.acquireLock(orderToTradeAgainst.getId())) {
-                if (!provider.getOrderBookBySymbol(orderToTradeAgainst.getSymbol())
-                             .getOrders(orderToTradeAgainst.getSide())
-                             .getOrDefault(orderToTradeAgainst.getPrice(), new ConcurrentSkipListSet<>())
-                             .contains(orderToTradeAgainst)) {
+                if (!checkIfOrderExists(orderToTradeAgainst)) {
                     OrdersLock.notifyLock(orderToTradeAgainst.getId());
                     continue;
                 }
@@ -114,6 +106,13 @@ public class TradeOrderConsumer implements Runnable {
             }
         }
         return order.getQuantity().get();
+    }
+
+    private boolean checkIfOrderExists(final Order order) {
+        return provider.getOrderBookBySymbol(order.getSymbol())
+                       .getOrders(order.getSide())
+                       .getOrDefault(order.getPrice(), new ConcurrentSkipListSet<>())
+                       .contains(order);
     }
 
     private void orderCompletelyFilledAndOrderAgainstPartiallyFilled(final Order order, final Order orderToTradeAgainst, int previousQuantTotal) {
