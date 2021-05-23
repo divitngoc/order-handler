@@ -84,7 +84,7 @@ public class TradeOrderConsumer implements Runnable {
 
             log.debug("Price match against orderId: {}", orderToTradeAgainst.getId());
             synchronized (OrdersLock.acquireLock(orderToTradeAgainst.getId())) {
-                if (!provider.checkIfOrderExists(orderToTradeAgainst)) {
+                if (!provider.checkIfOrderExists(orderToTradeAgainst) || !checkIfPriceIsStillSameLevel(orderToTradeAgainst.getPrice().get(), entry.getKey())) {
                     OrdersLock.notifyLock(orderToTradeAgainst.getId());
                     continue;
                 }
@@ -107,11 +107,15 @@ public class TradeOrderConsumer implements Runnable {
         return order.getQuantity().get();
     }
 
+    private boolean checkIfPriceIsStillSameLevel(BigDecimal price, BigDecimal currentPriceLevel) {
+        return price.compareTo(currentPriceLevel) == 0;
+    }
+
     private void orderCompletelyFilledAndOrderAgainstPartiallyFilled(final Order order, final Order orderToTradeAgainst, int previousQuantTotal) {
         orderToTradeAgainst.getQuantity().set(0);
         removeConsumer.accept(orderToTradeAgainst);
         OrdersLock.notifyLock(orderToTradeAgainst.getId());
-        log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice(),
+        log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice().get(),
                   Math.abs(order.getQuantity().get() - previousQuantTotal), orderToTradeAgainst.getId());
     }
 
@@ -121,7 +125,7 @@ public class TradeOrderConsumer implements Runnable {
         removeConsumer.accept(orderToTradeAgainst);
         removeConsumer.accept(order);
         OrdersLock.notifyLock(orderToTradeAgainst.getId());
-        log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice(), order.getQuantity(),
+        log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice().get(), order.getQuantity(),
                   orderToTradeAgainst.getId());
         return order.getQuantity().get();
     }
@@ -131,7 +135,7 @@ public class TradeOrderConsumer implements Runnable {
         order.getQuantity().set(0);
         removeConsumer.accept(order);
         OrdersLock.notifyLock(orderToTradeAgainst.getId());
-        log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice(), previousQuantTotal,
+        log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice().get(), previousQuantTotal,
                   orderToTradeAgainst.getId());
         return order.getQuantity().get();
     }
