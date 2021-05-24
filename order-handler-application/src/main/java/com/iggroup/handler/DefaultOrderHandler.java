@@ -44,38 +44,39 @@ public class DefaultOrderHandler implements OrderHandler {
     @Override
     public void modifyOrder(final Order order, final Order modifiedOrder) throws OrderModificationException {
         log.debug("Modifying OrderId [{}]...", order.getId());
-        synchronized (OrdersLock.acquireLock(order.getId())) {
-            if (!provider.checkIfOrderExists(order)) {
-                OrdersLock.notifyLock(order.getId());
-                log.debug("Order does not exist anymore for modifying");
-                return;
-            }
-            
-            if (order.getModification().get() > 4) {
-                log.debug("OrderId [{}] has more than 4 modifications applied, cannot be modified further", modifiedOrder.getId());
-                OrdersLock.notifyLock(order.getId());
-                throw new OrderModificationException("OrderId [" + order.getId() + "] has more than 4 modifications applied, cannot be modified further.");
-            }
-
-            log.debug("Modifying OrderId [{}] price [{}] and quantity [{}]...", order.getId(), order.getPrice().get(), order.getQuantity());
-            order.getModification().incrementAndGet();
-            order.getQuantity().set(modifiedOrder.getQuantity().intValue());
-
-            if (order.getPrice().get() != modifiedOrder.getPrice().get()) {
-                log.debug("Modifying OrderId [{}] price [{}] and quantity [{}] by removing and adding...", order.getId(), order.getPrice().get(), order.getQuantity());
-                removeOrder(order);
-                order.getPrice().set(modifiedOrder.getPrice().get());
-                addOrder(order);
-            }
-            log.debug("OrderId [{}] has been modified with new price of [{}] and quantity [{}].", modifiedOrder.getId(), modifiedOrder.getPrice(),
-                      modifiedOrder.getQuantity().get());
-            OrdersLock.notifyLock(order.getId());
+        OrdersLock.acquireLock(order.getId()).lock();
+        if (!provider.checkIfOrderExists(order)) {
+            OrdersLock.unlock(order.getId());
+            log.debug("Order does not exist anymore for modifying");
+            return;
         }
+
+        if (order.getModification().get() > 4) {
+            log.debug("OrderId [{}] has more than 4 modifications applied, cannot be modified further", modifiedOrder.getId());
+            OrdersLock.unlock(order.getId());
+            throw new OrderModificationException("OrderId [" + order.getId() + "] has more than 4 modifications applied, cannot be modified further.");
+        }
+
+        log.debug("Modifying OrderId [{}] price [{}] and quantity [{}]...", order.getId(), order.getPrice().get(), order.getQuantity().get());
+        order.getModification().incrementAndGet();
+        order.getQuantity().set(modifiedOrder.getQuantity().intValue());
+
+        if (order.getPrice().get() != modifiedOrder.getPrice().get()) {
+            log.debug("Modifying OrderId [{}] price [{}] and quantity [{}] by removing and adding...", order.getId(), order.getPrice().get(),
+                      order.getQuantity().get());
+            removeOrder(order);
+            order.getPrice().set(modifiedOrder.getPrice().get());
+            addOrder(order);
+        }
+        log.debug("OrderId [{}] has been modified with new price of [{}] and quantity [{}].", modifiedOrder.getId(), modifiedOrder.getPrice().get(),
+                  modifiedOrder.getQuantity().get());
+        OrdersLock.unlock(order.getId());
     }
 
     @Override
     public void removeOrder(final Order order) {
         log.debug("Removing orderId [{}]...", order.getId());
+        OrdersLock.acquireLock(order.getId()).tryLock();
         OrderBook orderBook = provider.getOrderBookBySymbol(order.getSymbol());
         ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> ordersMap = orderBook.getOrders(order.getSide());
         NavigableSet<Order> orders = ordersMap.get(order.getPrice().get());
@@ -85,6 +86,7 @@ public class DefaultOrderHandler implements OrderHandler {
         } else {
             orders.remove(order);
         }
+        OrdersLock.unlock(order.getId());
         log.debug("OrderId [{}] has been removed.", order.getId());
     }
 

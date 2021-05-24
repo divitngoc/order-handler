@@ -1,6 +1,8 @@
 package com.iggroup.lock;
 
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -9,20 +11,20 @@ public class OrdersLock {
 
     private OrdersLock() {}
 
-    private static final ConcurrentHashMap<Long, Object> locks = new ConcurrentHashMap<>(500);
+    private static final ConcurrentHashMap<Long, ReentrantLock> locks = new ConcurrentHashMap<>(500);
 
     public static boolean contains(final Long id) {
         return locks.contains(id);
     }
 
-    public static Object acquireLock(final Long id) {
+    public static Lock acquireLock(final Long id) {
         log.debug("Acquring lock for OrderId: {}", id);
-        return locks.computeIfAbsent(id, k -> new Object());
+        return locks.computeIfAbsent(id, k -> new ReentrantLock());
     }
 
-    public static void notifyLock(final Long id) {
+    public static void unlock(final Long id) {
         log.debug("Notifying lock for OrderId: {}", id);
-        locks.get(id).notifyAll();
+        locks.get(id).unlock();
     }
 
 }

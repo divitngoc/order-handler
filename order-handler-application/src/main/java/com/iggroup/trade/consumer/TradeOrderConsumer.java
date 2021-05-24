@@ -32,10 +32,9 @@ public class TradeOrderConsumer implements Runnable {
             Order order;
             try {
                 order = tradeQueue.take();
-                synchronized (OrdersLock.acquireLock(order.getId())) {
-                    executeTradePlan(order);
-                    OrdersLock.notifyLock(order.getId());
-                }
+                OrdersLock.acquireLock(order.getId()).lock();
+                executeTradePlan(order);
+                OrdersLock.unlock(order.getId());
             } catch (InterruptedException e) {
                 throw new RuntimeException();
             }
@@ -57,7 +56,8 @@ public class TradeOrderConsumer implements Runnable {
      * @throws InterruptedException
      */
     public void executeTradePlan(final Order order) {
-        if (!provider.checkIfOrderExists(order)) return;
+        if (!provider.checkIfOrderExists(order))
+            return;
 
         final ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> orderMap = getOppositeSideOrderMap(order.getSymbol(), order.getSide());
         log.debug("ExecuteTradePlan for OrderId [{}]", order.getId());
@@ -80,28 +80,28 @@ public class TradeOrderConsumer implements Runnable {
     private int executeTrade(final Order order, final Entry<BigDecimal, NavigableSet<Order>> entry) {
         for (Iterator<Order> iterator = entry.getValue().iterator(); iterator.hasNext();) {
             final Order orderToTradeAgainst = iterator.next();
-            if (!isBeforeArrivalDateTime(order, orderToTradeAgainst)) continue;
+            if (!isBeforeArrivalDateTime(order, orderToTradeAgainst))
+                continue;
 
             log.debug("Price match against orderId: {}", orderToTradeAgainst.getId());
-            synchronized (OrdersLock.acquireLock(orderToTradeAgainst.getId())) {
-                if (!provider.checkIfOrderExists(orderToTradeAgainst) || !checkIfPriceIsStillSameLevel(orderToTradeAgainst.getPrice().get(), entry.getKey())) {
-                    OrdersLock.notifyLock(orderToTradeAgainst.getId());
-                    continue;
-                }
+            OrdersLock.acquireLock(orderToTradeAgainst.getId()).lock();
+            if (!provider.checkIfOrderExists(orderToTradeAgainst) || !checkIfPriceIsStillSameLevel(orderToTradeAgainst.getPrice().get(), entry.getKey())) {
+                OrdersLock.unlock(orderToTradeAgainst.getId());
+                continue;
+            }
 
-                log.info("Trade executing for orderId [{}]... against orderId [{}]", order.getId(), orderToTradeAgainst.getId());
-                int previousQuantTotal = order.getQuantity().getPlain();
-                order.getQuantity().set(order.getQuantity().get() - orderToTradeAgainst.getQuantity().get());
-                if (order.getQuantity().get() > 0) {
-                    // Order to trade is completely filled and order is partially filled
-                    orderCompletelyFilledAndOrderAgainstPartiallyFilled(order, orderToTradeAgainst, previousQuantTotal);
-                } else if (order.getQuantity().get() == 0) {
-                    // Both orders is completely filled
-                    return orderAndOrderAgainstCompletelyFilled(order, orderToTradeAgainst);
-                } else {
-                    // Order to trade partially filled and order is completely filled
-                    return orderPartiallyFilledAndOrderAgainstCompletelyFilled(order, orderToTradeAgainst, previousQuantTotal);
-                }
+            log.debug("Trade executing for orderId [{}]... against orderId [{}]", order.getId(), orderToTradeAgainst.getId());
+            int previousQuantTotal = order.getQuantity().getPlain();
+            order.getQuantity().set(order.getQuantity().get() - orderToTradeAgainst.getQuantity().get());
+            if (order.getQuantity().get() > 0) {
+                // Order to trade is completely filled and order is partially filled
+                orderCompletelyFilledAndOrderAgainstPartiallyFilled(order, orderToTradeAgainst, previousQuantTotal);
+            } else if (order.getQuantity().get() == 0) {
+                // Both orders is completely filled
+                return orderAndOrderAgainstCompletelyFilled(order, orderToTradeAgainst);
+            } else {
+                // Order to trade partially filled and order is completely filled
+                return orderPartiallyFilledAndOrderAgainstCompletelyFilled(order, orderToTradeAgainst, previousQuantTotal);
             }
         }
         return order.getQuantity().get();
@@ -114,7 +114,7 @@ public class TradeOrderConsumer implements Runnable {
     private void orderCompletelyFilledAndOrderAgainstPartiallyFilled(final Order order, final Order orderToTradeAgainst, int previousQuantTotal) {
         orderToTradeAgainst.getQuantity().set(0);
         removeConsumer.accept(orderToTradeAgainst);
-        OrdersLock.notifyLock(orderToTradeAgainst.getId());
+        OrdersLock.unlock(orderToTradeAgainst.getId());
         log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice().get(),
                   Math.abs(order.getQuantity().get() - previousQuantTotal), orderToTradeAgainst.getId());
     }
@@ -124,7 +124,7 @@ public class TradeOrderConsumer implements Runnable {
         orderToTradeAgainst.getQuantity().set(0);
         removeConsumer.accept(orderToTradeAgainst);
         removeConsumer.accept(order);
-        OrdersLock.notifyLock(orderToTradeAgainst.getId());
+        OrdersLock.unlock(orderToTradeAgainst.getId());
         log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice().get(), order.getQuantity(),
                   orderToTradeAgainst.getId());
         return order.getQuantity().get();
@@ -134,7 +134,7 @@ public class TradeOrderConsumer implements Runnable {
         orderToTradeAgainst.getQuantity().set(Math.abs(order.getQuantity().get()));
         order.getQuantity().set(0);
         removeConsumer.accept(order);
-        OrdersLock.notifyLock(orderToTradeAgainst.getId());
+        OrdersLock.unlock(orderToTradeAgainst.getId());
         log.debug(SIDE_TRADE_EXECUTED_LOG_FORMAT, order.getId(), order.getSide(), orderToTradeAgainst.getPrice().get(), previousQuantTotal,
                   orderToTradeAgainst.getId());
         return order.getQuantity().get();
