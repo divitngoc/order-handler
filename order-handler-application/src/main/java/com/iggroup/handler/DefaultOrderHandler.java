@@ -77,6 +77,12 @@ public class DefaultOrderHandler implements OrderHandler {
     public void removeOrder(final Order order) {
         log.debug("Removing orderId [{}]...", order.getId());
         OrdersLock.acquireLock(order.getId()).tryLock();
+        if (!provider.checkIfOrderExists(order)) {
+            log.debug("Order [{}] does not exist anymore to be removed. ", order.getId());
+            OrdersLock.unlock(order.getId());
+            return;
+        }
+
         OrderBook orderBook = provider.getOrderBookBySymbol(order.getSymbol());
         ConcurrentNavigableMap<BigDecimal, NavigableSet<Order>> ordersMap = orderBook.getOrders(order.getSide());
         NavigableSet<Order> orders = ordersMap.get(order.getPrice().get());
