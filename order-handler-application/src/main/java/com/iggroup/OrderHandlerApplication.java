@@ -24,6 +24,8 @@ public class OrderHandlerApplication {
         startOrderProducer(orderHandler, "IGG");
         startOrderProducer(orderHandler, "IGG");
         startOrderProducer(orderHandler, "IGG");
+        startOrderProducer(orderHandler, "IGG");
+        startOrderProducer(orderHandler, "IGG");
         startTradeConsumer(orderHandler, tradeQueue);
         startTradeConsumer(orderHandler, tradeQueue);
         startTradeConsumer(orderHandler, tradeQueue);

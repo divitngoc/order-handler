@@ -29,14 +29,15 @@ public class TradeOrderConsumer implements Runnable {
     @Override
     public void run() {
         while (true) {
-            Order order;
+            Order order = null;
             try {
                 order = tradeQueue.take();
                 OrdersLock.acquireLock(order.getId()).lock();
                 executeTradePlan(order);
-                OrdersLock.unlock(order.getId());
             } catch (InterruptedException e) {
-                throw new RuntimeException();
+                throw new RuntimeException(e);
+            } finally {
+                if (order != null) OrdersLock.unlock(order.getId());
             }
         }
     }
@@ -52,8 +53,6 @@ public class TradeOrderConsumer implements Runnable {
      * Scenario 3: Order unable to completely fill the opposite side order. <br>
      * 
      * @param order
-     * @param removeConsumer
-     * @throws InterruptedException
      */
     public void executeTradePlan(final Order order) {
         if (!provider.checkIfOrderExists(order))
@@ -78,8 +77,7 @@ public class TradeOrderConsumer implements Runnable {
     }
 
     private int executeTrade(final Order order, final Entry<BigDecimal, NavigableSet<Order>> entry) {
-        for (Iterator<Order> iterator = entry.getValue().iterator(); iterator.hasNext();) {
-            final Order orderToTradeAgainst = iterator.next();
+        for (final Order orderToTradeAgainst : entry.getValue()) {
             if (!isBeforeArrivalDateTime(order, orderToTradeAgainst))
                 continue;
 

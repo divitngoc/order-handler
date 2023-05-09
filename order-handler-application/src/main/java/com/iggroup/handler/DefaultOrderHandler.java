@@ -61,7 +61,7 @@ public class DefaultOrderHandler implements OrderHandler {
         order.getModification().incrementAndGet();
         order.getQuantity().set(modifiedOrder.getQuantity().intValue());
 
-        if (order.getPrice().get() != modifiedOrder.getPrice().get()) {
+        if (order.getPrice().get().compareTo(modifiedOrder.getPrice().get()) != 0) {
             log.debug("Modifying OrderId [{}] price [{}] and quantity [{}] by removing and adding...", order.getId(), order.getPrice().get(),
                       order.getQuantity().get());
             removeOrder(order);
@@ -114,7 +114,7 @@ public class DefaultOrderHandler implements OrderHandler {
             final BigDecimal totalQuantityByPrice = entry.getValue()
                                                          .stream()
                                                          .map(o -> BigDecimal.valueOf(o.getQuantity().get()))
-                                                         .reduce((a, b) -> a.add(b))
+                                                         .reduce(BigDecimal::add)
                                                          .orElseGet(() -> BigDecimal.ZERO);
             final BigDecimal previousCurrQuantity = currentQuantity;
             currentQuantity = currentQuantity.add(totalQuantityByPrice);
